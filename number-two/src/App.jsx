@@ -12,6 +12,7 @@ import "@arcgis/map-components/components/arcgis-locate";
 import Map from "@arcgis/core/Map.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import View from "@arcgis/core/views/View.js";
+//import places from "@arcgis/core/rest/places.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
 import BathroomCard from "./BathroomCard.jsx";
@@ -23,6 +24,7 @@ function App() {
   const defaultZoom = 10;
 
   let clickPoint; // Clicked Point on Map
+  let dataLayer = "439b9127797a428e97589420adee7775"; // Access to data
 
   const [viewPoint, setViewPoint] = useState(null); // Viewpoint set state
   const [addPin, setAddPin] = useState(false);
