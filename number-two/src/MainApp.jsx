@@ -15,6 +15,7 @@ import "@arcgis/map-components/components/arcgis-locate";
 import Map from "@arcgis/core/Map.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import View from "@arcgis/core/views/View.js";
+import Circle from "@arcgis/core/geometry/Circle.js";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
@@ -55,6 +56,7 @@ function MainApp({ onBackToWelcome }) {
     const [bottomSheetHeight, setBottomSheetHeight] = useState(window.innerWidth <= 768 ? 160 : 420);
     const [isDragging, setIsDragging] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [selectedRadius, setSelectedRadius] = useState('0.5');
 
     const locateRef = useRef(null);
     const bottomSheetRef = useRef(null);
@@ -64,6 +66,11 @@ function MainApp({ onBackToWelcome }) {
     // Graphics layer for pins
     let pointLayer = new GraphicsLayer({
         id: "pointLayer",
+    });
+
+    // Graphics layer for radius
+    let radiusLayer = new GraphicsLayer({
+        id: "radiusLayer",
     });
 
     // Feature Layer with real bathroom data
@@ -159,6 +166,7 @@ function MainApp({ onBackToWelcome }) {
         const view = viewElement.arcgisView;
         viewElement.map.add(pointLayer); // Layer for point
         viewElement.map.add(selectedLayer); // Layer for selected bathroom points
+        viewElement.map.add(radiusLayer); //Layer for radius
     };
 
     const recenterMap = () => {
@@ -187,6 +195,7 @@ function MainApp({ onBackToWelcome }) {
     function clearGraphics() {
         pointLayer.removeAll(); // Remove graphics from GraphicsLayer
         selectedLayer.removeAll(); // Clear selection
+        radiusLayer.removeAll(); // Clear radius
     }
 
     // Event Listener for dropping pin
@@ -198,7 +207,33 @@ function MainApp({ onBackToWelcome }) {
         clickPoint && queryFeatures(clickPoint);
     };
 
+    function distanceToNum(value){
+        let num = 0.5;
+        switch(value){
+            case "0.1":
+                num = 0.1;
+                break;
+            case "0.25":
+                num = 0.25;
+                break;
+            case "0.5":
+                num = 0.5;
+                break;
+            case "0.75":
+                num = 0.75;
+                break;
+            case "1.0":
+                num = 1;
+                break; 
+            default:
+                num = 0.5;   
+        }
+        return num;
+    }
+
     async function placePoint(click) {
+        const distanceNow = distanceToNum(selectedRadius);
+
         const markerSymbol = {
             type: "simple-marker",
             style: "triangle",
@@ -215,17 +250,40 @@ function MainApp({ onBackToWelcome }) {
             symbol: markerSymbol,
         });
 
+        const circleGeometry = new Circle({
+          center: click,
+          geodesic: true,
+          numberOfPoints: 100,
+          radius: distanceNow,
+          //radius: 0.5, 
+          radiusUnit: "miles",
+        });
+
+        const circleGraphic = new Graphic({
+          geometry: circleGeometry,
+          symbol: {
+            type: "simple-fill", // autocasts as SimpleFillSymbol
+            style: "solid",
+            color: [3, 140, 255, 0.1],
+            outline: {
+              width: 1,
+              color: [3, 140, 255],
+            },
+          },
+        });
+        radiusLayer.graphics.add(circleGraphic);
         pointLayer.graphics.add(pointGraphic);
     };
 
     // Query the feature layer with the bathroom data points
     function queryFeatures(point) {
         let units = "miles";
+        const distanceNow = distanceToNum(selectedRadius);
         dataLayer
             .queryFeatures({
                 geometry: point,
                 // distance and units will be null if basic query selected
-                distance: distance,
+                distance: distanceNow,
                 units: units,
                 spatialRelationship: "intersects",
                 returnGeometry: true,
@@ -254,6 +312,13 @@ function MainApp({ onBackToWelcome }) {
         });
 
         selectedLayer.graphics.addMany(results.features);
+    }
+
+    const handleMapRefresh = () => {
+        clearGraphics();
+
+        clickPoint && placePoint(clickPoint);
+        clickPoint && queryFeatures(clickPoint);
     }
 
     const toggleBottomSheet = () => {
@@ -349,31 +414,22 @@ function MainApp({ onBackToWelcome }) {
                         </div>
 
                         <div style={{ position: 'relative' }}>
-                            <Search style={{
-                                position: 'absolute',
-                                left: '12px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: '#9ca3af',
-                                width: '16px',
-                                height: '16px'
-                            }} />
-                            <input
-                                type="text"
-                                placeholder="Search for a place, address, or location of interest"
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 16px 12px 40px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '8px',
-                                    fontSize: '14px',
-                                    outline: 'none',
-                                    boxSizing: 'border-box',
-                                    fontFamily: 'inherit'
+                           <label>
+                                Select Radius:
+                                <select
+                                value={selectedRadius}
+                                onChange={e => {
+                                    setSelectedRadius(e.target.value);
+                                    handleMapRefresh();
                                 }}
-                            />
+                                >
+                                <option value="0.1">0.1 miles</option>
+                                <option value="0.25">0.25 miles</option>
+                                <option value="0.5">0.5 miles</option>
+                                <option value="0.75">0.75 miles</option>
+                                <option value="1.0">1.0 miles</option>
+                                </select>
+                            </label>
                         </div>
                     </div>
 
@@ -586,35 +642,21 @@ function MainApp({ onBackToWelcome }) {
                     </div>
                 )}
 
-                {/* SEARCH SECTION */}
+                {/* SELECT DISTANCE */}
                 <div style={{ padding: '0 24px 16px', flexShrink: 0 }}>
-                    <div style={{ position: 'relative' }}>
-                        <Search style={{
-                            position: 'absolute',
-                            left: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: '#9ca3af',
-                            width: '16px',
-                            height: '16px'
-                        }} />
-                        <input
-                            type="text"
-                            placeholder="Search for restrooms..."
-                            value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '12px 16px 12px 40px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '8px',
-                                fontSize: '16px',
-                                outline: 'none',
-                                boxSizing: 'border-box',
-                                fontFamily: 'inherit'
-                            }}
-                        />
-                    </div>
+                    <label>
+                        Select Radius:
+                        <select
+                        value={selectedRadius}
+                        onChange={e => setSelectedRadius(e.target.value)}
+                        >
+                        <option value="0.1">0.1 miles</option>
+                        <option value="0.25">0.25 miles</option>
+                        <option value="0.5">0.5 miles</option>
+                        <option value="0.75">0.75 miles</option>
+                        <option value="1.0">1.0 miles</option>
+                        </select>
+                    </label>
                 </div>
 
                 {/* LOCATIONS HEADER */}
