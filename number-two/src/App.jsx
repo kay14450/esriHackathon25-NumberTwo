@@ -12,6 +12,9 @@ import "@arcgis/map-components/components/arcgis-locate";
 import Map from "@arcgis/core/Map.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import View from "@arcgis/core/views/View.js";
+import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
+import FeatureSet from "@arcgis/core/rest/support/FeatureSet.js";
+import FeatureFilter from "@arcgis/core/layers/support/FeatureFilter.js";
 //import places from "@arcgis/core/rest/places.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
@@ -24,7 +27,6 @@ function App() {
   const defaultZoom = 10;
 
   let clickPoint; // Clicked Point on Map
-  let dataLayer = "439b9127797a428e97589420adee7775"; // Access to data
 
   const [viewPoint, setViewPoint] = useState(null); // Viewpoint set state
   const [addPin, setAddPin] = useState(false);
@@ -36,11 +38,25 @@ function App() {
     id: "pointLayer",
   });
 
+  // Feature Layer with data
+  let dataLayer = new FeatureLayer({
+    portalItem: {
+      id: "439b9127797a428e97589420adee7775",
+    },
+    outFields: ["*"],
+  });
+
+  // Graphic Layer for new data points
+  let selectedLayer = new GraphicsLayer({
+    id: "selectedLayer",
+  });
+
   const handleViewReady = (event) => {
     let viewElement = event.target;
     //setViewPoint(viewElement); // This causes adding point to no longer work
     const view = viewElement.arcgisView;
     viewElement.map.add(pointLayer); // Layer for point
+    viewElement.map.add(selectedLayer);
   };
 
   const recenterMap = () => {
@@ -69,6 +85,7 @@ function App() {
   // Clear Pin Layer
   function clearGraphics() {
     pointLayer.removeAll(); // Remove graphics from GraphicsLayer
+    selectedLayer.removeAll();
   }
 
   // Event Listener for dropping pin
@@ -77,6 +94,7 @@ function App() {
     clickPoint = event.detail.mapPoint;
     // Pass point to the showPlaces() function
     clickPoint && placePoint(clickPoint);
+    clickPoint && queryFeatures(clickPoint);
   };
 
   // Place point based on click
@@ -98,6 +116,45 @@ function App() {
     });
 
     pointLayer.graphics.add(pointGraphic);
+  }
+
+  function queryFeatures(point) {
+    //const point = view.toMap(screenPoint);
+    let distance = 0.5;
+    let units = "miles";
+    dataLayer
+      .queryFeatures({
+        geometry: point,
+        // distance and units will be null if basic query selected
+        distance: distance,
+        units: units,
+        spatialRelationship: "intersects",
+        returnGeometry: true,
+        returnQueryGeometry: true,
+        outFields: ["*"],
+      })
+      .then((results) => {
+        displayResults(results);
+      });
+  }
+
+  function displayResults(results) {
+    const symbol = {
+      type: "simple-marker",
+      style: "triangle",
+      size: 10,
+      color: "blue",
+      outline: {
+        color: "white",
+        width: 2,
+      },
+    };
+
+    results.features.forEach((feature) => {
+      feature.symbol = symbol;
+    });
+
+    selectedLayer.graphics.addMany(results.features);
   }
 
   return (
