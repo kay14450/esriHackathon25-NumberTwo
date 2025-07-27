@@ -16,12 +16,15 @@ import Map from "@arcgis/core/Map.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import View from "@arcgis/core/views/View.js";
 import * as geometryEngine from "@arcgis/core/geometry/geometryEngine"
+import * as geometryService from "@arcgis/core/rest/geometryService.js";
 import Point from "@arcgis/core/geometry/Point"
 import Circle from "@arcgis/core/geometry/Circle.js";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
-import BathroomCard from "./BathroomCard"
+import BathroomCard from "./BathroomCard";
+import DistanceMeasurement2D from "@arcgis/core/widgets/DistanceMeasurement2D.js";
+import DistanceParameters from "@arcgis/core/rest/support/DistanceParameters.js";
 
 function MainApp({ onBackToWelcome }) {
     const defaultCenter = [-73.9856644, 40.7484405];
@@ -42,6 +45,7 @@ function MainApp({ onBackToWelcome }) {
     const [shouldRoute, setShouldRoute] = useState(false);
     const [clickGeom, setClickGeom] = useState(null);
     const [selectedBathroom, setSelectedBathroom] = useState(null);
+    const [distanceBetween, setDistanceBetween] = useState(0.2);
 
 
     const locateRef = useRef(null);
@@ -216,6 +220,9 @@ function MainApp({ onBackToWelcome }) {
         // Pass point to the showPlaces() function
         clickPoint && placePoint(clickPoint);
         clickPoint && queryFeatures(clickPoint);
+
+        // Calculate distance with click geometry
+        //clickGeom && calculateDistance(bathroomPoint, clickGeom); // Save two points as a value to prevent changes in the middle
     };
 
     async function placePoint(click) {
@@ -314,6 +321,22 @@ function MainApp({ onBackToWelcome }) {
 
         setSelectedBathroom(bathroomPoint);
     };
+
+    function calculateDistance(bathroomPoint, currenPoint){
+        //geometryService = new GeometryService("https://utility.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer");
+        var distParams = new DistanceParameters();
+        distParams.distanceUnit = "miles";
+
+        distParams.geometry1 = currenPoint;
+        distParams.geometry2 = bathroomPoint;
+        distParams.geodesic = true;
+        geometryService.distance(distParams, function(distanceHere) {
+            //return distance;
+            setDistanceBetween(distanceHere);
+        });
+
+        //setDstanceBetween(calculateDistance);
+    }
 
 
     // Desktop layout
@@ -450,11 +473,13 @@ function MainApp({ onBackToWelcome }) {
                             paddingBottom: '16px'
                         }}>
                             <div className="feature-cards">
-                                {queriedFeatures.map((feature, index) => (
+                                {clickGeom && queriedFeatures.map((feature, index) => (
                                     <div key={index}>
                                         <BathroomCard
                                             title={feature.attributes.Facility_Name}
                                             description={feature.attributes.Restroom_Type}
+                                            currenPoint={clickGeom}
+                                            featurePoint={feature}
                                         />
                                         <button style={{ padding: '0.5rem', borderRadius: "0.25rem", backgroundColor: "white"}} onClick={() => handleRouteClick(feature)}>Go here</button>
                                     </div>
@@ -714,11 +739,13 @@ function MainApp({ onBackToWelcome }) {
                     paddingBottom: '16px'
                 }}>
                     <div className="feature-cards">
-                        {queriedFeatures.map((feature, index) => (
+                        {clickGeom && queriedFeatures.map((feature, index) => (
                             <div key={index}>
                                 <BathroomCard
                                     title={feature.attributes.Facility_Name}
                                     description={feature.attributes.Restroom_Type}
+                                    currenPoint={clickGeom}
+                                    featurePoint={feature}
                                 />
                                 <button style={{ padding: '0.5rem', borderRadius: "0.25rem", backgroundColor: "white"}} onClick={() => handleRouteClick(feature)}>Go here</button>
                             </div>
